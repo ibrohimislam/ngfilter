@@ -1,29 +1,59 @@
-#include <linux/kernel.h>
-#include <linux/ip.h>
-#include <linux/netfilter/x_tables.h>
-#include <linux/skbuff.h>
 #include <linux/module.h>
+#include <linux/netfilter/x_tables.h>
+#include <linux/ip.h>
+#include <linux/icmp.h>
+#include <linux/tcp.h>
 
 #include "xt_ngfilter.h"
+#include "string_match.h"
+#include "smb.h"
+#include "netbios.h"
 
 MODULE_AUTHOR("Ibrohim Kholilul Islam <ibrohimislam@gmail.com>");
 MODULE_DESCRIPTION("Xtables: packet filter with DPI");
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_ALIAS("ipt_ngfilter");
 
-static bool is_dpi_match(const struct sk_buff *skb, __u8 protocol) {
-	// TODO: implement
-	return false;
+struct payload_t {
+	unsigned char *data;
+	__u32 len;
+};
+
+static const struct payload_t * get_payload(const struct sk_buff *skb) {
+	struct iphdr *ip_header;
+	unsigned char *transport_header;
+
+	__u32 transport_header_len;
+
+	struct payload_t *result = kmalloc(sizeof(struct payload_t), GFP_NOWAIT);
+
+    if (!skb) return result;
+
+    ip_header = ip_hdr(skb);
+    transport_header = skb_transport_header(skb);
+
+	switch (ip_header->protocol) {
+	case IPPROTO_ICMP:
+		transport_header_len = 16;
+		break;
+	case IPPROTO_TCP:
+		transport_header_len = tcp_hdr(skb)->doff * 4;
+		break;
+	default:
+		return result;
+	}
+
+    result->data = ((unsigned char *)transport_header + transport_header_len);
+	result->len = (__u32)(ntohs(ip_header->tot_len) - ip_header->ihl*4 - transport_header_len);
+
+	return result;
 }
 
-static bool is_pattern_match(const struct sk_buff *skb, __u8 *pattern) {
-	// TODO: implement
-	return false;
-}
+static bool smb_command_match(const struct payload_t *payload, const unsigned char command){
+	struct smb_header *smb_header;
+	smb_header = (struct smb_header *) payload->data + 4;
 
-static bool is_protocol_exists(const __u8 protocol) {
-	// TODO: implement
-	return true;
+	return smb_header->command == command;
 }
 
 /*
@@ -32,19 +62,23 @@ static bool is_protocol_exists(const __u8 protocol) {
 static bool ngfilter_match(const struct sk_buff *skb, struct xt_action_param *param) {
 	const struct xt_ngfilter_mtinfo *info = param->matchinfo;
 	const struct iphdr *ip_header = ip_hdr(skb);
-
+	const struct payload_t *payload = get_payload(skb);
+    
 	pr_info("SRC=%pI4 DST=%pI4\n", &ip_header->saddr, &ip_header->daddr);
 
-	if (is_have_flag(info,XT_NGFILTER_DPI) && !is_dpi_match(skb, info->dpi)) {
-		pr_notice("protocol - no match\n");
+	if (is_have_flag(info, XT_NGFILTER_PATTERN) &&
+		!string_match((const char *) info->pattern, payload->data, strlen(info->pattern), payload->len)) {
 		return false;
 	}
 
-	if (is_have_flag(info,XT_NGFILTER_PATTERN) && !is_pattern_match(skb, info->pattern)) {
-		pr_notice("pattern - no match\n");
+	if (is_have_flag(info,XT_NGFILTER_SMB_COMMAND) &&
+		!smb_command_match(payload, info->smb_command)) {
 		return false;
 	}
 
+	kfree(payload);
+
+	pr_notice("pattern %s - match\n", info->pattern);
 	return true;
 }
 
@@ -63,19 +97,13 @@ static int ngfilter_match_check(const struct xt_mtchk_param *par) {
 		return -EINVAL;
 	}
 	
-	if (is_have_flag(info, XT_NGFILTER_DPI) && !is_protocol_exists(info->dpi)) {
-		pr_info("Protocol not found on nDPI implementation.\n");
-		return -EINVAL;
-	}
-	
 	return 0;
 }
 
 static void ngfilter_match_destroy(const struct xt_mtdtor_param *par) {
 	const struct xt_ngfilter_mtinfo *info = par->matchinfo;
-	pr_info("Test for protocol %08lX removed\n", info->dpi);
+	pr_info("Test for pattern %s\n", info->pattern);
 }
-
 
 static struct xt_match ngfilter_match4_reg __read_mostly = {
 	.name = "ngfilter",

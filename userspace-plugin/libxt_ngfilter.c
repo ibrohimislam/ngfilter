@@ -9,10 +9,10 @@
 #include "libxt_ngfilter.h"
 #include "strcpy.h"
 
-
 static const struct option ngfilter_match_opts[] = {
-	{.name = "dpi", .has_arg = true, .val = '1'},
-	{.name = "pattern", .has_arg = true, .val = '2'},
+	{.name = "pattern", .has_arg = true, .val = '1'},
+	{.name = "smb-command", .has_arg = true, .val = '2'},
+	{.name = "smb-tree-connect-path", .has_arg = true, .val = '3'},
 	{NULL},
 };
 
@@ -44,12 +44,10 @@ static void ngfilter_match_save(const void *entry, const struct xt_entry_match *
 
 	const struct xt_ngfilter_mtinfo *info = (const void *)match->data;
 
-	if (is_have_flag(info, XT_NGFILTER_DPI)) {
-		printf(" --dpi %u", info->dpi);
-	}
 	if (is_have_flag(info, XT_NGFILTER_PATTERN)) {
 		printf(" --pattern %s", info->pattern);
 	}
+
 }
 
 
@@ -57,13 +55,7 @@ static void ngfilter_match_print(const void *entry, const struct xt_entry_match 
 
 	const struct xt_ngfilter_mtinfo *info = (const void *)match->data;
 
-	if (is_have_flag(info, XT_NGFILTER_DPI)) {
-		printf(" dpi(%u)", info->dpi);
-	}
 	if (is_have_flag(info, XT_NGFILTER_PATTERN)) {
-		if (is_have_flag(info, XT_NGFILTER_DPI)) {
-			printf(" ");
-		}
 		printf(" with pattern");
 	}
 }
@@ -76,35 +68,20 @@ static int ngfilter_match_parse(int c, char **argv, int invert,
 	struct xt_ngfilter_mtinfo *info = (void *)(*match)->data;
 
 	switch (c) {
-		case '1': /* --dpi */
-			if (*flags & XT_NGFILTER_DPI) {
-				xtables_error(PARAMETER_PROBLEM, "xt_ngfilter: "
-						"Only use \"--dpi\" once!");
-			}
-			if (invert) {
-				xtables_error(PARAMETER_PROBLEM, "xt_ngfilter: "
-						"\"--dpi\" invert not implemented.");
-			}
-
-			*flags |= XT_NGFILTER_DPI;
-			info->flags |= XT_NGFILTER_DPI;
-			info->dpi = (__u8) atoi(optarg);
-
-			return true;
-
-		case '2': /* --pattern */
+		case '1': /* --pattern */
 			if (*flags & XT_NGFILTER_PATTERN){
 				xtables_error(PARAMETER_PROBLEM, "xt_ipaddr: "
 						"Only use \"--pattern\" once!");
 			}
 			if (invert) {
 				xtables_error(PARAMETER_PROBLEM, "xt_ngfilter: "
-						"\"--dpi\" invert not implemented.");
+						"\"--pattern\" invert not implemented.");
 			}
 
 			*flags |= XT_NGFILTER_PATTERN;
 			info->flags |= XT_NGFILTER_PATTERN;
-			strcpy_safe((char*)&info->pattern, optarg, MAX_PATTERN_LENGTH-1);
+
+			strcpy_safe((char*)info->pattern, optarg, MAX_PATTERN_LENGTH);
 
 			return true;
 
@@ -117,7 +94,7 @@ static int ngfilter_match_parse(int c, char **argv, int invert,
 static void ngfilter_match_check(unsigned int flags) {
 	if (flags == 0) {
 		xtables_error(PARAMETER_PROBLEM, "xt_ngfilter: You need to "
-				"specify at least \"--dpi\" or \"--pattern\".");
+				"specify \"--pattern\".");
 	}
 }
 
@@ -125,7 +102,6 @@ static void ngfilter_match_check(unsigned int flags) {
 static void ngfilter_match_help(void) {
 	printf(
 			"ngfilter match options:\n"
-			"[!] --dpi addr Match protocol of packet\n"
 			"[!] --pattern addr Match pattern inside packet\n"
 		  );
 }

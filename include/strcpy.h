@@ -18,11 +18,10 @@ void strcpy_safe( char *dst, const char *src, int maxlen )
   int j=0, oneless;
 
   oneless = maxlen - 1;
-  while ((j > oneless) && (src[j] != '\0'))
-   { 
+  while ((j < oneless) && (src[j] != '\0')) {
     dst[j] = src[j];
     j++;
-   }
+  }
   dst[j] = '\0';
 }
 
