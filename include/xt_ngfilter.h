@@ -31,7 +31,7 @@
 enum {
   XT_NGFILTER_PATTERN = 1 << 0,
   XT_NGFILTER_SMB_COMMAND = 1 << 1,
-  XT_NGFILTER_SMB_TREE_CONNECT_PATH = 1 << 2,
+  XT_NGFILTER_SMB_TREE_CONNECT_ANDX_PATH = 1 << 2,
 };
 
 
@@ -43,9 +43,9 @@ enum {
  */
 #define MAX_PATTERN_LENGTH 256
 struct xt_ngfilter_mtinfo {
+  __u8 flags;
   unsigned char pattern[MAX_PATTERN_LENGTH];
   unsigned char smb_command;
-  __u8 flags;
 };
 
 #endif /* _LINUX_NETFILTER_XT_NGFILTER_H */

@@ -19,6 +19,8 @@ struct payload_t {
 	__u32 len;
 };
 
+const __u32 netbios_header_len = 4;
+
 static const struct payload_t * get_payload(const struct sk_buff *skb) {
 	struct iphdr *ip_header;
 	unsigned char *transport_header;
@@ -51,7 +53,7 @@ static const struct payload_t * get_payload(const struct sk_buff *skb) {
 
 static bool smb_command_match(const struct payload_t *payload, const unsigned char command){
 	struct smb_header *smb_header;
-	smb_header = (struct smb_header *) payload->data + 4;
+	smb_header = (struct smb_header *) payload->data + netbios_header_len;
 
 	return smb_header->command == command;
 }
