@@ -53,7 +53,9 @@ static const struct payload_t * get_payload(const struct sk_buff *skb) {
 
 static bool smb_command_match(const struct payload_t *payload, const unsigned char command){
 	struct smb_header *smb_header;
-	smb_header = (struct smb_header *) payload->data + netbios_header_len;
+	smb_header = (struct smb_header *) payload->data;
+
+        //pr_info("smb command: %x %x", smb_header->command, command);
 
 	return smb_header->command == command;
 }
@@ -66,7 +68,7 @@ static bool ngfilter_match(const struct sk_buff *skb, struct xt_action_param *pa
 	const struct iphdr *ip_header = ip_hdr(skb);
 	const struct payload_t *payload = get_payload(skb);
     
-	pr_info("SRC=%pI4 DST=%pI4\n", &ip_header->saddr, &ip_header->daddr);
+	//pr_info("SRC=%pI4 DST=%pI4\n", &ip_header->saddr, &ip_header->daddr);
 
 	if (is_have_flag(info, XT_NGFILTER_PATTERN) &&
 		!string_match((const char *) info->pattern, payload->data, strlen(info->pattern), payload->len)) {
@@ -79,8 +81,6 @@ static bool ngfilter_match(const struct sk_buff *skb, struct xt_action_param *pa
 	}
 
 	kfree(payload);
-
-	pr_notice("pattern %s - match\n", info->pattern);
 	return true;
 }
 
@@ -90,10 +90,6 @@ static bool ngfilter_match(const struct sk_buff *skb, struct xt_action_param *pa
 static int ngfilter_match_check(const struct xt_mtchk_param *par) {
 	const struct xt_ngfilter_mtinfo *info = par->matchinfo;
 	
-	pr_info("Added a rule with -m ngfilter in the %s table; this rule is "
-			"reachable through hooks 0x%x\n",
-			par->table, par->hook_mask);
-
 	if (info->flags == 0) {
 		pr_info("not testing for anything\n");
 		return -EINVAL;
